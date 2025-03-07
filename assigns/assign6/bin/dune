@@ -1,0 +1,4 @@
+(executable
+ (public_name assign6)
+ (name main)
+ (libraries stdlib320 assign6))

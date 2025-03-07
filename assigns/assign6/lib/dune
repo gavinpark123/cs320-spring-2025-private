@@ -1,0 +1,4 @@
+(library
+ (public_name assign6)
+ (libraries stdlib320)
+ (flags (:standard -w -27 -w -32 -w -33 -w -37 -w -69)))
