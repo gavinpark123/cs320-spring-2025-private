@@ -1,0 +1,3 @@
+(library (name demo))
+(menhir (modules parser))
+(ocamllex lexer)
