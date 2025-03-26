@@ -1,0 +1,11 @@
+(lang dune 3.17)
+
+(name sexpr_parse)
+
+(generate_opam_files true)
+
+(package
+ (name sexpr_parse)
+ (depends ocaml))
+
+(using menhir 3.0)

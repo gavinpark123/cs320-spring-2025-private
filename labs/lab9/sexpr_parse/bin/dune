@@ -1,0 +1,4 @@
+(executable
+ (public_name sexpr_parse)
+ (name main)
+ (libraries sexpr_parse))
