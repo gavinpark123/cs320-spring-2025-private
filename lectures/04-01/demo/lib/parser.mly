@@ -8,6 +8,7 @@ open Utils
 %token LPAREN
 %token RPAREN
 %token LET
+%token REC
 %token EQ
 %token IN
 %token <string> VAR
@@ -29,6 +30,7 @@ prog:
 
 expr:
   | LET; x=VAR; EQ; e1=expr; IN; e2=expr { Let(x, e1, e2) }
+  | LET; REC; f=VAR; x=VAR; EQ; e1=expr; IN; e2=expr { LetRec(f, x, e1, e2) }
   | IF; e1=expr; THEN; e2=expr; ELSE; e3=expr { If (e1, e2, e3) }
   | FUN; x=VAR; ARROW; e=expr { Fun(x, e) }
   | e = expr2 { e }
