@@ -7,6 +7,8 @@ type expr =
   | If of expr * expr * expr
   | App of expr * expr
   | Let of string * expr * expr
+    (* let rec f x = e1 in e2 *)
+  | LetRec of string * string * expr * expr
 
 type prog = expr
 
@@ -17,7 +19,7 @@ and value =
   | VBool of bool
   | VNum of int
   (* | VFun of string * expr *)
-  | VClos of string * expr * env
+  | VClos of string * expr * env * string option
 
 
 

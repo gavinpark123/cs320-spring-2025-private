@@ -8,6 +8,9 @@ let parse (s : string) : expr option =
 let rec eval (env : env) (e : expr) : value option =
   let rec go e =
     match e with
+    | LetRec(f, x, e1, e2) ->
+      (* < env[f -> (env, fun x -> e1, f)] , e2 > *)
+      eval (Env.add f (VClos (x, e1, env, Some f)) env) e2
     | Let(x, e1, e2) -> (
       match go e1 with
         (* < env, e1 > ==> v1 *)
@@ -19,7 +22,7 @@ let rec eval (env : env) (e : expr) : value option =
     | App (e1, e2) -> (
       match go e1 with
         (* < env, e1 > ==> (fun x -> e, env') *)
-      | Some (VClos (x, e, env')) -> (
+      | Some (VClos (x, e, env', None)) -> (
         match go e2 with
           (* < env, e2 > ==> v2 *)
         | Some v2 ->
@@ -27,11 +30,21 @@ let rec eval (env : env) (e : expr) : value option =
           eval (Env.add x v2 env') e
         | _ -> None
       )
+      | Some (VClos (x, e, env', Some f)) -> (
+        match go e2 with
+          (* < env , e2 > ==> v2 *)
+        | Some v2 ->
+          let env' = Env.add f (VClos (x, e, env', Some f)) env' in
+          let env' = Env.add x v2 env' in
+          (* < env'[f -> (env', fun x -> e, f)][x -> v2] , e > ==> v *)
+          eval env' e
+        | None -> None
+      )
       | _ -> None
     )
     | Var x -> Env.find_opt x env
     | Num n -> Some (VNum n)
-    | Fun (x, e) -> Some (VClos (x, e, env))
+    | Fun (x, e) -> Some (VClos (x, e, env, None))
     | Add (e1, e2) -> (
       match go e1 with
       | Some (VNum m) -> (
