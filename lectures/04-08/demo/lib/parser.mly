@@ -36,6 +36,7 @@ ty:
   | INTTY { IntTy }
   | BOOLTY { BoolTy }
   | t1=ty; ARROW; t2=ty { FunTy(t1, t2) }
+  | LPAREN; ty=ty; RPAREN { ty }
 
 toplet:
   | LET; x=VAR; COLON; ty=ty; EQ; e=expr { TLet(x, ty, e) }
