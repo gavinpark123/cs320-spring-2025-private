@@ -5,7 +5,109 @@ let parse (s : string) : prog option =
   | e -> Some e
   | exception _ -> None
 
-let desugar (_ : prog) : expr = assert false
+let rec desugar (p : prog) : expr =
+  match p with
+  | [] -> assert false
+  | TLet (name, ty, binding) :: [] ->
+    Let (name, ty, binding, Var name)
+  | TLetRec (name, arg, arg_ty, ty, binding) :: [] ->
+    LetRec (name, arg, arg_ty, ty, binding, Var name)
+  | TLet (name, ty, binding) :: p ->
+    let body = desugar p in
+    Let (name, ty, binding, body)
+  | TLetRec (name, arg, arg_ty, ty, binding) :: p ->
+    let body = desugar p in
+    LetRec (name, arg, arg_ty, ty, binding, body)
+
+type ctxt = ty Env.t
+
+let type_of (e : expr) : ty option =
+  let rec type_of (ctxt : ctxt) (e : expr) : ty option =
+    let rec go e =
+      match e with
+      | Var x -> Env.find_opt x ctxt
+      | Num _ -> Some IntTy
+        (* ctxt, x : ty |- e : ty'               *)
+        (* ------------------------------------- *)
+        (* ctxt |- fun (x : ty) -> e : ty -> ty' *)
+      | Fun (x, ty, e) -> (
+        let ctxt = Env.add x ty ctxt in
+        match type_of ctxt e with
+        | Some ty' -> Some (FunTy (ty, ty'))
+        | None -> None (* type error *)
+      )
+        (* ctxt |- e1 : ty -> ty' ctxt |- e2 : ty *)
+        (* -------------------------------------- *)
+        (* ctxt |- e1 e2 : ty'                    *)
+      | App (e1, e2) -> (
+        match go e1 with
+        | Some (FunTy(ty, ty')) -> (
+          match go e2 with
+          | Some ty'' ->
+            if ty'' = ty
+            then Some ty'
+            else None
+          | _ -> None
+        )
+        | _ -> None
+      )
+      | Add (e1, e2) -> (
+        match go e1 with
+        | Some IntTy -> (
+          match go e2 with
+          | Some IntTy -> Some IntTy
+          | _ -> None
+        )
+        | _ -> None
+      )
+      | Eq (e1, e2) -> (
+        match go e1 with
+        | Some IntTy -> (
+          match go e2 with
+          | Some IntTy -> Some BoolTy
+          | _ -> None
+        )
+        | _ -> None
+      )
+      | If (e1, e2, e3) -> (
+        match go e1 with
+        | Some BoolTy -> (
+          match go e2 with
+          | Some t1 -> (
+            match go e3 with
+            | Some t2 ->
+              if t1 = t2
+              then Some t1
+              else None
+            | _ -> None
+          )
+          | _ -> None
+        )
+        | _ -> None
+      )
+      | Let (x, ty_ann, e1, e2) -> (
+        match go e1 with
+        | Some ty ->
+          if ty = ty_ann
+          then
+            let ctxt = Env.add x ty_ann ctxt in
+            type_of ctxt e2
+          else None
+        | _ -> None
+      )
+      | LetRec (f, x, x_ty, ty_ann, e1, e2) -> (
+        let ctxt = Env.add f (FunTy (x_ty, ty_ann)) ctxt in
+        let ctxt' = Env.add x x_ty ctxt in
+        match type_of ctxt' e1 with
+        | Some ty ->
+          if ty = ty_ann
+          then type_of ctxt e2
+          else None
+        | _ -> None
+      )
+in go e
+
+  in type_of Env.empty e
 
 let rec eval (env : env) (e : expr) : value option =
   let rec go e =

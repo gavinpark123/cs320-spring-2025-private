@@ -5,7 +5,6 @@ open Utils
 %token INTTY
 %token BOOLTY
 %token COLON
-%token EOF
 %token FUN
 %token ARROW
 %token LPAREN
@@ -20,9 +19,11 @@ open Utils
 %token THEN
 %token ELSE
 %token PLUS
+%token EOF
 
 %left EQ
 %left PLUS
+%right ARROW
 
 %start <Utils.prog> prog
 
@@ -51,8 +52,8 @@ expr:
 expr2:
   | e1 = expr2; PLUS; e2 = expr2 { Add (e1, e2) }
   | e1 = expr2; EQ; e2 = expr2 { Eq (e1, e2) }
-  | e = expr3; es = expr3*
-    { List.fold_left (fun e1 e2 -> App (e1, e2)) e es }
+  | es = expr3+
+    { List.(fold_left (fun e1 e2 -> App (e1, e2)) (hd es) (tl es)) }
 
 expr3:
   | x = VAR { Var x }
