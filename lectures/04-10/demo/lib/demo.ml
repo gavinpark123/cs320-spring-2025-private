@@ -52,16 +52,41 @@ let ty_subst ty x =
         let new_var = fresh () in
         Forall (new_var, go (replace_var new_var y ty'))
   in go
+
+let alpha_equiv =
+  let rec go ty1 ty2 =
+    ty1 = ty2
+    || match ty1, ty2 with
+       | Forall (a1, ty1), Forall (a2, ty2) ->
+          let new_var = fresh () in
+          go (replace_var new_var a1 ty1) (replace_var new_var a2 ty2)
+       | _ -> false
+  in go
+
+let free a =
+  let rec go = function
+    | TyVar b -> a = b
+    | FunTy (t1, t2) -> go t1 || go t2
+    | Forall (b, ty) ->
+       if a = b
+       then false
+       else go ty
+    | _ -> false
+  in go
 (* END ADDED *)
 
 let type_of (e : expr) : ty option =
+  let (=) = alpha_equiv in
   let rec type_of (ctxt : ctxt) (e : expr) : ty option =
     let rec go e =
       match e with
       (* ADDED *)
       | TyFun(x, e) -> (
         match go e with
-        | Some ty -> Some (Forall (x, ty))
+        | Some ty ->
+           if Env.for_all (fun _ ty -> not (free x ty)) ctxt
+           then Some (Forall (x, ty))
+           else None
         | _ -> None
       )
       | TyApp (e, ty) -> (
