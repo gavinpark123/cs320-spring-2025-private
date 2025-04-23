@@ -1,5 +1,38 @@
 include Utils
 
+type constr = ty * ty
+type solution = (string * ty) list
+
+let ty_subst (ty : ty) (x : string) : ty -> ty =
+  let rec go = function
+    | TInt -> TInt
+    | TBool -> TBool
+    | TFun (t1, t2) -> TFun (go t1, go t2)
+    | TVar y -> if x = y then ty else TVar y
+  in go
+
+let rec free = function
+  | TInt -> VarSet.empty
+  | TBool -> VarSet.empty
+  | TFun (t1, t2) -> VarSet.union (free t1) (free t2)
+  | TVar x -> VarSet.singleton x
+
+let rec unify (s : solution) (cs : constr list) : solution option =
+  let rec go = function
+    | [] -> Some (List.rev s)
+    | (t1, t2) :: cs when t1 = t2 -> go cs
+    | (TFun (s1, t1), TFun (s2, t2)) :: cs -> go ((s1, s2) :: (t1, t2) :: cs)
+    | (TVar x, ty) :: cs when not (VarSet.mem x (free ty)) ->
+      unify
+        ((x, ty) :: s)
+        (List.map
+          (fun (t1, t2) -> (ty_subst ty x t1, ty_subst ty x t2))
+          cs)
+    | (ty, TVar x) :: cs -> go ((TVar x, ty) :: cs)
+    | _ -> None
+  in go cs
+let unify = unify []
+
 let parse (s : string) : expr option =
   match Parser.prog Lexer.read (Lexing.from_string s) with
   | e -> Some e
