@@ -38,6 +38,63 @@ let parse (s : string) : prog option =
   | e -> Some e
   | exception _ -> None
 
+type stc_env = ty_scheme Env.t
+let env_add x ty env = Env.add x (Forall (VarSet.empty, ty)) env
+
+let count = ref 0
+
+let gensym () =
+  let _ = count := 1 + !count in
+  TVar ("$" ^ string_of_int !count)
+
+let instantiate (Forall (_bvs, _ty) : ty_scheme) : ty =
+  assert false
+
+let rec type_of (ctxt : stc_env) (e : expr) : ty * constr list =
+  let rec go = function
+    | Num _ -> TInt, []
+    | Add (e1, e2) ->
+      let t1, cs1 = go e1 in
+      let t2, cs2 = go e2 in
+      TInt, (t1, TInt) :: (t2, TInt) :: cs1 @ cs2
+    | Eq (e1, e2) ->
+      let t1, cs1 = go e1 in
+      let t2, cs2 = go e2 in
+      TBool, (t1, t2) :: cs1 @ cs2
+    | If (e1, e2, e3) ->
+      let t1, cs1 = go e1 in
+      let t2, cs2 = go e2 in
+      let t3, cs3 = go e3 in
+      t3, (t1, TBool) :: (t2, t3) :: cs1 @ cs2 @ cs3
+    | Let (x, e1, e2) ->
+      let t1, cs1 = go e1 in
+      let t2, cs2 = type_of (env_add x t1 ctxt) e2 in
+      t2, cs1 @ cs2
+    | Fun (x, e) ->
+      let a = gensym () in
+      let ty, cs = type_of (env_add x a ctxt) e in
+      TFun (a, ty), cs
+    | App (e1, e2) ->
+      let t1, cs1 = go e1 in
+      let t2, cs2 = go e2 in
+      let a = gensym () in
+      a, (t1, TFun (t2, a)) :: cs1 @ cs2
+    | Var x ->
+      match Env.find_opt x ctxt with
+      | None -> TInt, [TInt, TBool]
+      | Some ty_scheme -> instantiate ty_scheme, []
+  in go e
+
+let apply_solution (_s : solution) (_ty : ty) : ty =
+  assert false (* Hint: fold *)
+
+let principle_type (ty, cs) =
+  match unify cs with
+  | Some s ->
+    let ty = apply_solution s ty in
+    Some (Forall (free ty, ty))
+  | None -> None
+
 let rec eval (env : env) (e : expr) : value option =
   let rec go e =
     match e with
