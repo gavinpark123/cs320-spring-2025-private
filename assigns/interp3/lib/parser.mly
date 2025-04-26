@@ -54,105 +54,154 @@ let mk_list h es =
 %left STAR MULF DIV DIVF MOD
 %left POW
 
+%inline bop
+
 %start <Utils.prog> prog
 
 %%
 
 prog:
-  | ls = toplet* EOF          { ls }
+  | ls = toplet* EOF
+      { ls }
 
 and toplet:
   | LET rc = REC?; name = VAR; args = arg*; ty = annot?; EQ; binding = expr
-    { { is_rec = Option.is_some rc
-      ; name
-      ; binding = mk_func ty args binding
+      { { is_rec  = Option.is_some rc
+        ; name    = name
+        ; binding = mk_func ty args binding
+        }
       }
-    }
 
 and annot:
-  | COLON; ty = ty             { ty }
+  | COLON; ty = ty
+      { ty }
 
 and ty:
-  | TUNIT                      { TUnit }
-  | TINT                       { TInt }
-  | TFLOAT                     { TFloat }
-  | TBOOL                      { TBool }
-  | TLIST                      { TList }
-  | TOPTION                    { TOption }
-  | TVAR                       { TParam tvar }
-  | LPAREN; ty; RPAREN         { ty }
-  | ty1 = ty; ARROW; ty2 = ty  { TFun (ty1, ty2) }
+  | TUNIT
+      { TUnit }
+  | TINT
+      { TInt }
+  | TFLOAT
+      { TFloat }
+  | TBOOL
+      { TBool }
+  | TLIST
+      { TList }
+  | TOPTION
+      { TOption }
+  | TVAR
+      { TParam tvar }
+  | LPAREN; ty = ty; RPAREN
+      { ty }
+  | ty1 = ty; ARROW; ty2 = ty
+      { TFun (ty1, ty2) }
 
 and arg:
-  | x = VAR                    { (x, None) }
-  | LPAREN; x = VAR; ty = annot; RPAREN { (x, Some ty) }
+  | x = VAR
+      { (x, None) }
+  | LPAREN; x = VAR; ty = annot; RPAREN
+      { (x, Some ty) }
 
 and expr:
   | LET rc = REC?; name = VAR; args = arg*; ty = annot?; EQ; binding = expr; IN; body = expr
-    { Let { is_rec = Option.is_some rc
-          ; name
-          ; binding = mk_func ty args binding
-          ; body
-          }
-    }
+      { Let { is_rec  = Option.is_some rc
+            ; name    = name
+            ; binding = mk_func ty args binding
+            ; body    = body
+            }
+      }
   | IF; c = expr; THEN; t = expr; ELSE; e = expr
-    { If (c, t, e) }
+      { If (c, t, e) }
   | MATCH; e = expr; WITH; cases = case+
-    { Match (e, cases) }
+      { Match (e, cases) }
   | FUN; args = arg*; ARROW; body = expr
-    { mk_func None args body }
-  | e = expr2                  { e }
+      { mk_func None args body }
+  | e = expr2
+      { e }
 
 and case:
   | ALT; p = pattern; ARROW; e = expr
-    { (p, e) }
+      { (p, e) }
 
-and %inline bop:
-  | ADD   { Add   } | SUB   { Sub   }
-  | STAR  { Mul   } | DIV   { Div   }
-  | MOD   { Mod   }
-  | ADDF  { AddF  } | SUBF  { SubF  }
-  | MULF  { MulF  } | DIVF  { DivF  }
-  | POW   { PowF  }
-  | CONS  { Cons  }
-  | LT    { Lt    } | LTE   { Lte   }
-  | GT    { Gt    } | GTE   { Gte   }
-  | EQ    { Eq    } | NEQ   { Neq   }
-  | AND   { And   } | OR    { Or    }
-  | COMMA { Comma }
-
+and %inline bop:  (* this line is ignored since %inline is above *)
 and expr2:
-  | e1 = expr2; op = bop; e2 = expr2   { Bop (op, e1, e2) }
-  | ASSERT; e = expr3                  { Assert e }
-  | SOME; e = expr3                    { ESome e }
-  | es = expr3+                        { List.(fold_left (fun acc x -> App (acc, x)) (hd es) (tl es)) }
+  | e1 = expr2; op = bop; e2 = expr2
+      { Bop (op, e1, e2) }
+  | ASSERT; e = expr3
+      { Assert e }
+  | SOME; e = expr3
+      { ESome e }
+  | es = expr3+
+      { List.(fold_left (fun acc x -> App (acc, x)) (hd es) (tl es)) }
 
 and expr3:
-  | LPAREN; RPAREN                    { Unit }
-  | TRUE                              { Bool true }
-  | FALSE                             { Bool false }
-  | NONE                              { ENone }
-  | LBRACKET; RBRACKET                { Nil }
+  | LPAREN; RPAREN
+      { Unit }
+  | TRUE
+      { Bool true }
+  | FALSE
+      { Bool false }
+  | NONE
+      { ENone }
+  | LBRACKET; RBRACKET
+      { Nil }
   | LBRACKET; e = expr; es = list_item*; RBRACKET
-    { mk_list e es }
-  | n = INT                           { Int n }
-  | n = FLOAT                         { Float n }
-  | x = VAR                           { Var x }
+      { mk_list e es }
+  | n = INT
+      { Int n }
+  | n = FLOAT
+      { Float n }
+  | x = VAR
+      { Var x }
 
 and list_item:
-  | SEMICOLON; e = expr               { e }
+  | SEMICOLON; e = expr
+      { e }
 
 and pattern:
-  | p1 = pattern; CONS; p2 = pattern  { PCons (p1, p2) }
-  | atom = pattern_atom               { atom }
+  | p1 = pattern; CONS; p2 = pattern
+      { PCons (p1, p2) }
+  | atom = pattern_atom
+      { atom }
 
 and pattern_atom:
-  | LPAREN; p = pattern; RPAREN       { p }
-  | n = INT                           { PInt n }
-  | n = FLOAT                         { PFloat n }
-  | x = VAR                           { PVar x }
-  | TRUE                              { PBool true }
-  | FALSE                             { PBool false }
-  | NONE                              { PNone }
-  | SOME; p = pattern_atom            { PSome p }
-  | LBRACKET; RBRACKET                { PNil }
+  | LPAREN; p = pattern; RPAREN
+      { p }
+  | n = INT
+      { PInt n }
+  | n = FLOAT
+      { PFloat n }
+  | x = VAR
+      { PVar x }
+  | TRUE
+      { PBool true }
+  | FALSE
+      { PBool false }
+  | NONE
+      { PNone }
+  | SOME; p = pattern_atom
+      { PSome p }
+  | LBRACKET; RBRACKET
+      { PNil }
+
+and bop:
+  | ADD   { Add   }
+  | SUB   { Sub   }
+  | STAR  { Mul   }
+  | DIV   { Div   }
+  | MOD   { Mod   }
+  | ADDF  { AddF  }
+  | SUBF  { SubF  }
+  | MULF  { MulF  }
+  | DIVF  { DivF  }
+  | POW   { PowF  }
+  | CONS  { Cons  }
+  | LT    { Lt    }
+  | LTE   { Lte   }
+  | GT    { Gt    }
+  | GTE   { Gte   }
+  | EQ    { Eq    }
+  | NEQ   { Neq   }
+  | AND   { And   }
+  | OR    { Or    }
+  | COMMA { Comma }
