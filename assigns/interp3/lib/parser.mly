@@ -77,24 +77,15 @@ and annot:
       { ty }
 
 and ty:
-  | TUNIT
-      { TUnit }
-  | TINT
-      { TInt }
-  | TFLOAT
-      { TFloat }
-  | TBOOL
-      { TBool }
-  | TLIST
-      { TList }
-  | TOPTION
-      { TOption }
-  | TVAR
-      { TParam tvar }
-  | LPAREN; ty = ty; RPAREN
-      { ty }
-  | ty1 = ty; ARROW; ty2 = ty
-      { TFun (ty1, ty2) }
+  | TUNIT                      { TUnit }
+  | TINT                       { TInt }
+  | TFLOAT                     { TFloat }
+  | TBOOL                      { TBool }
+  | TLIST                      { TList }
+  | TOPTION                    { TOption }
+  | TVAR                       { TParam tvar }
+  | LPAREN; ty = ty; RPAREN    { ty }
+  | ty1 = ty; ARROW; ty2 = ty  { TFun (ty1, ty2) }
 
 and arg:
   | x = VAR
@@ -104,11 +95,12 @@ and arg:
 
 and expr:
   | LET rc = REC?; name = VAR; args = arg*; ty = annot?; EQ; binding = expr; IN; body = expr
-      { Let { is_rec  = Option.is_some rc
-            ; name    = name
-            ; binding = mk_func ty args binding
-            ; body    = body
-            }
+      { Let
+          { is_rec  = Option.is_some rc
+          ; name    = name
+          ; binding = mk_func ty args binding
+          ; body    = body
+          }
       }
   | IF; c = expr; THEN; t = expr; ELSE; e = expr
       { If (c, t, e) }
@@ -123,7 +115,6 @@ and case:
   | ALT; p = pattern; ARROW; e = expr
       { (p, e) }
 
-and %inline bop:  (* this line is ignored since %inline is above *)
 and expr2:
   | e1 = expr2; op = bop; e2 = expr2
       { Bop (op, e1, e2) }
