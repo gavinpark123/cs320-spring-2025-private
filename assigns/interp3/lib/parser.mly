@@ -22,7 +22,7 @@ let mk_list h es =
   Bop (Cons, h, tl)
 %}
 
-(* Tokens *)
+(* --- Tokens --- *)
 %token EOF
 %token <int>    INT
 %token <float>  FLOAT
@@ -41,7 +41,7 @@ let mk_list h es =
 %token ADDF SUBF MULF DIVF POW CONS
 %token LT LTE GT GTE NEQ AND OR COMMA
 
-(* Precedences *)
+(* --- Precedences --- *)
 %nonassoc TLIST
 %nonassoc TOPTION
 %right ARROW
@@ -55,7 +55,6 @@ let mk_list h es =
 %left POW
 
 %inline bop
-
 %start <Utils.prog> prog
 
 %%
@@ -95,12 +94,11 @@ and arg:
 
 and expr:
   | LET rc = REC?; name = VAR; args = arg*; ty = annot?; EQ; binding = expr; IN; body = expr
-      { Let
-          { is_rec  = Option.is_some rc
-          ; name    = name
-          ; binding = mk_func ty args binding
-          ; body    = body
-          }
+      { Let { is_rec  = Option.is_some rc
+            ; name    = name
+            ; binding = mk_func ty args binding
+            ; body    = body
+            }
       }
   | IF; c = expr; THEN; t = expr; ELSE; e = expr
       { If (c, t, e) }
@@ -194,5 +192,5 @@ and bop:
   | EQ    { Eq    }
   | NEQ   { Neq   }
   | AND   { And   }
-  | OR    { Or    }
+  | OR    { Or   }
   | COMMA { Comma }
