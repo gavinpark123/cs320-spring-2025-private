@@ -4,8 +4,8 @@ open Utils
 let mk_func ty args body =
   let body =
     match ty with
-    | None -> body
-    | Some ty -> Annot (body, ty)
+    | None   -> body
+    | Some t -> Annot (body, t)
   in
   List.fold_right
     (fun (x, ty) acc -> Fun (x, ty, acc))
@@ -13,74 +13,35 @@ let mk_func ty args body =
     body
 
 let mk_list h es =
-  let tl = List.fold_right
-    (fun x acc -> Bop (Cons, x, acc))
-    es
-    Nil
-  in Bop (Cons, h, tl)
+  let tl =
+    List.fold_right
+      (fun x acc -> Bop (Cons, x, acc))
+      es
+      Nil
+  in
+  Bop (Cons, h, tl)
 %}
 
+(* Tokens *)
 %token EOF
-%token <int> INT
-%token <float> FLOAT
+%token <int>    INT
+%token <float>  FLOAT
 %token <string> VAR
-
-%token LET
-%token REC
-%token EQ
-%token IN
-%token COLON
-
-%token FUN
-%token MATCH
-%token WITH
-%token ALT
-%token IF
-%token THEN
-%token ELSE
-
-%token LPAREN
-%token RPAREN
-%token LBRACKET
-%token RBRACKET
-%token SEMICOLON
-
-%token TUNIT
-%token TINT
-%token TFLOAT
-%token TBOOL
-%token TLIST
-%token TOPTION
 %token <string> TVAR
-%token ARROW
 
-%token TRUE
-%token FALSE
+%token LET REC EQ IN COLON
+%token FUN IF THEN ELSE
+%token MATCH WITH ALT
+%token TRUE FALSE NONE SOME ASSERT
 
-%token ADD
-%token SUB
-%token STAR
-%token DIV
-%token MOD
-%token ADDF
-%token SUBF
-%token MULF
-%token DIVF
-%token POW
-%token CONS
-%token LT
-%token LTE
-%token GT
-%token GTE
-%token NEQ
-%token AND
-%token OR
-%token COMMA
+%token LPAREN RPAREN LBRACKET RBRACKET SEMICOLON
+%token TUNIT TINT TFLOAT TBOOL TLIST TOPTION ARROW
 
-%token SOME
-%token NONE
-%token ASSERT
+%token ADD SUB STAR DIV MOD
+%token ADDF SUBF MULF DIVF POW CONS
+%token LT LTE GT GTE NEQ AND OR COMMA
 
+(* Precedences *)
 %nonassoc TLIST
 %nonassoc TOPTION
 %right ARROW
@@ -98,84 +59,100 @@ let mk_list h es =
 %%
 
 prog:
-  | ls = toplet* EOF { ls }
+  | ls = toplet* EOF          { ls }
 
-toplet:
-  | LET; rc=REC?; name=VAR; args=arg*; ty=annot?; EQ; binding=expr
-    { {
-	is_rec = Option.is_some rc;
-	name;
-	binding = mk_func ty args binding;
+and toplet:
+  | LET rc = REC?; name = VAR; args = arg*; ty = annot?; EQ; binding = expr
+    { { is_rec = Option.is_some rc
+      ; name
+      ; binding = mk_func ty args binding
       }
     }
 
-annot:
-  | COLON; ty=ty { ty }
+and annot:
+  | COLON; ty = ty             { ty }
 
-ty:
-  | TUNIT { TUnit }
+and ty:
+  | TUNIT                      { TUnit }
+  | TINT                       { TInt }
+  | TFLOAT                     { TFloat }
+  | TBOOL                      { TBool }
+  | TLIST                      { TList }
+  | TOPTION                    { TOption }
+  | TVAR                       { TParam tvar }
+  | LPAREN; ty; RPAREN         { ty }
+  | ty1 = ty; ARROW; ty2 = ty  { TFun (ty1, ty2) }
 
-arg:
-  | x=VAR { (x, None) }
-  | LPAREN; x=VAR; ty=annot; RPAREN { (x, Some ty) }
+and arg:
+  | x = VAR                    { (x, None) }
+  | LPAREN; x = VAR; ty = annot; RPAREN { (x, Some ty) }
 
-expr:
-  | LET; rc=REC?; name=VAR; args=arg*; ty=annot?; EQ; binding=expr; IN; body=expr
-    { Let
-	{
-	  is_rec = (Option.is_some rc);
-	  name;
-	  binding= mk_func ty args binding;
-	  body;
-	}
+and expr:
+  | LET rc = REC?; name = VAR; args = arg*; ty = annot?; EQ; binding = expr; IN; body = expr
+    { Let { is_rec = Option.is_some rc
+          ; name
+          ; binding = mk_func ty args binding
+          ; body
+          }
     }
-  | FUN; args=arg*; ARROW; body=expr { mk_func None args body }
-  | e = expr2 { e }
+  | IF; c = expr; THEN; t = expr; ELSE; e = expr
+    { If (c, t, e) }
+  | MATCH; e = expr; WITH; cases = case+
+    { Match (e, cases) }
+  | FUN; args = arg*; ARROW; body = expr
+    { mk_func None args body }
+  | e = expr2                  { e }
 
-%inline bop:
-  | ADD { Add }
-  | SUB { Sub }
-  | STAR { Mul }
-  | DIV { Div }
-  | MOD { Mod }
-  | ADDF { AddF }
-  | SUBF { SubF }
-  | MULF { MulF }
-  | DIVF { DivF }
-  | POW { PowF }
-  | CONS { Cons }
-  | LT { Lt }
-  | LTE { Lte }
-  | GT { Gt }
-  | GTE { Gte }
-  | EQ { Eq }
-  | NEQ { Neq }
-  | AND { And }
-  | OR { Or }
+and case:
+  | ALT; p = pattern; ARROW; e = expr
+    { (p, e) }
+
+and %inline bop:
+  | ADD   { Add   } | SUB   { Sub   }
+  | STAR  { Mul   } | DIV   { Div   }
+  | MOD   { Mod   }
+  | ADDF  { AddF  } | SUBF  { SubF  }
+  | MULF  { MulF  } | DIVF  { DivF  }
+  | POW   { PowF  }
+  | CONS  { Cons  }
+  | LT    { Lt    } | LTE   { Lte   }
+  | GT    { Gt    } | GTE   { Gte   }
+  | EQ    { Eq    } | NEQ   { Neq   }
+  | AND   { And   } | OR    { Or    }
   | COMMA { Comma }
 
-expr2:
-  | e1=expr2; op=bop; e2=expr2 { Bop (op, e1, e2) }
-  | ASSERT; e=expr3 { Assert e }
-  | SOME; e=expr3 { ESome e }
-  | es=expr3+
-    { List.(fold_left
-	      (fun acc x -> App (acc, x))
-	      (hd es)
-	      (tl es))
-    }
+and expr2:
+  | e1 = expr2; op = bop; e2 = expr2   { Bop (op, e1, e2) }
+  | ASSERT; e = expr3                  { Assert e }
+  | SOME; e = expr3                    { ESome e }
+  | es = expr3+                        { List.(fold_left (fun acc x -> App (acc, x)) (hd es) (tl es)) }
 
-list_item:
-  | SEMICOLON; e=expr { e }
-
-expr3:
-  | LPAREN; RPAREN { Unit }
-  | TRUE { Bool true }
-  | FALSE { Bool false }
-  | NONE { ENone }
-  | LBRACKET; RBRACKET { Nil }
-  | LBRACKET; e=expr; es=list_item*; RBRACKET
+and expr3:
+  | LPAREN; RPAREN                    { Unit }
+  | TRUE                              { Bool true }
+  | FALSE                             { Bool false }
+  | NONE                              { ENone }
+  | LBRACKET; RBRACKET                { Nil }
+  | LBRACKET; e = expr; es = list_item*; RBRACKET
     { mk_list e es }
-  | n=INT { Int n }
-  | n=FLOAT { Float n }
-  | x=VAR { Var x }
+  | n = INT                           { Int n }
+  | n = FLOAT                         { Float n }
+  | x = VAR                           { Var x }
+
+and list_item:
+  | SEMICOLON; e = expr               { e }
+
+and pattern:
+  | p1 = pattern; CONS; p2 = pattern  { PCons (p1, p2) }
+  | atom = pattern_atom               { atom }
+
+and pattern_atom:
+  | LPAREN; p = pattern; RPAREN       { p }
+  | n = INT                           { PInt n }
+  | n = FLOAT                         { PFloat n }
+  | x = VAR                           { PVar x }
+  | TRUE                              { PBool true }
+  | FALSE                             { PBool false }
+  | NONE                              { PNone }
+  | SOME; p = pattern_atom            { PSome p }
+  | LBRACKET; RBRACKET                { PNil }
