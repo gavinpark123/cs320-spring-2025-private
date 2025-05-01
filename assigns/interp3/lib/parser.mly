@@ -117,12 +117,12 @@ ty:
   | TINT { TInt }
   | TFLOAT { TFloat }
   | TBOOL { TBool }
-  | ty1=ty; TLIST { TList ty1 }
-  | ty1=ty; TOPTION { TOption ty1 }
-  | LPAREN; ty1=ty; COMMA; ty2=ty; RPAREN { TPair (ty1, ty2) }
-  | ty1=ty; ARROW; ty2=ty { TFun (ty1, ty2) }
-  | LPAREN; ty1=ty; RPAREN { ty1 }
-  | v=TVAR { TVar v }
+  | TVAR { TVar $1 }
+  | t=ty; TLIST { TList t }
+  | t=ty; TOPTION { TOption t }
+  | t1=ty; STAR; t2=ty { TPair (t1, t2) }
+  | t1=ty; ARROW; t2=ty { TFun (t1, t2) }
+  | LPAREN; t=ty; RPAREN { t }
 
 arg:
   | x=VAR { (x, None) }
@@ -138,19 +138,14 @@ expr:
 	  body;
 	}
     }
-  | FUN; args=arg*; ARROW; body=expr { mk_func None args body }
-  | IF; e1=expr; THEN; e2=expr; ELSE; e3=expr { If (e1, e2, e3) }
-  | MATCH; e=expr; WITH; 
-      ALT; SOME; x=VAR; ARROW; e1=expr;
-      ALT; NONE; ARROW; e2=expr
-      { OptMatch { matched = e; some_name = x; some_case = e1; none_case = e2 } }
-  | MATCH; e=expr; WITH;
-      ALT; x=VAR; CONS; y=VAR; ARROW; e1=expr;
-      ALT; LBRACKET; RBRACKET; ARROW; e2=expr
-      { ListMatch { matched = e; hd_name = x; tl_name = y; cons_case = e1; nil_case = e2 } }
-  | MATCH; e=expr; WITH;
-    ALT; x=VAR; COMMA; y=VAR; ARROW; e3=expr
-    { PairMatch { matched = e; fst_name = x; snd_name = y; case = e3 } }
+  | FUN; args=arg+; ARROW; body=expr { mk_func None args body }
+  | IF; cond=expr; THEN; e1=expr; ELSE; e2=expr { If (cond, e1, e2) }
+  | MATCH; e=expr; WITH; ALT; h=VAR; CONS; t=VAR; ARROW; e1=expr; ALT; LBRACKET; RBRACKET; ARROW; e2=expr
+    { ListMatch { matched = e; hd_name = h; tl_name = t; cons_case = e1; nil_case = e2 } }
+  | MATCH; e=expr; WITH; ALT; SOME; x=VAR; ARROW; e1=expr; ALT; NONE; ARROW; e2=expr
+    { OptMatch { matched = e; some_name = x; some_case = e1; none_case = e2 } }
+  | MATCH; e=expr; WITH; ALT; x=VAR; COMMA; y=VAR; ARROW; e1=expr
+    { PairMatch { matched = e; fst_name = x; snd_name = y; case = e1 } }
   | e = expr2 { e }
 
 %inline bop:
@@ -200,6 +195,8 @@ expr3:
   | n=INT { Int n }
   | n=FLOAT { Float n }
   | x=VAR { Var x }
-  | LPAREN; e=expr; RPAREN { e }
-  | LPAREN; e=expr; COLON; t=ty; RPAREN { Annot (e, t) }
-  | LPAREN; e1=expr; COMMA; e2=expr; RPAREN { Bop (Comma, e1, e2) }
+  | LPAREN; e=expr; ty=annot?; RPAREN
+    { match ty with
+      | None -> e
+      | Some ty -> Annot (e, ty)
+    }
